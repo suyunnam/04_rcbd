@@ -14,6 +14,7 @@ Here is where we load the packages we will use.
 # Loading packages
 library(tidyverse) # for data wrangling and plotting
 library(ggplot2)
+library(dplyr)
 ```
 
 # Treatment design  
@@ -61,11 +62,8 @@ Let's assume we have space for 9 rows and 4 columns.
 ```{r crd_layout}
 crd_layout <- crd_rand %>%
   # Defining number of rows and columns in the field for plotting purposes
-  mutate(row = rep(1:4, each=9)) %>%
-  mutate(col = rep(seq(from = 1,
-                   to = 9,
-                   by = 1), times = 4
-              )) %>%
+  mutate(row = rep(1:4, each=9),
+         col = rep(seq(from = 1, to = 9, by = 1), times = 4)) %>%
   # Creating plot and trtname labels for plotting
   mutate(lab = paste0(plot, "\n", trtname))
   
@@ -96,14 +94,24 @@ Notice how due to unrestricted randomization, we had the replication of some tre
 # Setting seed to get same randomization result every time
 set.seed(930)
 
-rcbd_rand 
+rcbd_rand <- crossing(trtname = trts$trtname,
+                      rep = 1:4
+                      ) %>%
+  arrange(rep) %>%
+  group_by(rep) %>%                       # sort and then group by rep (block)
+  mutate(trtname = sample(trtname)) %>%   # Shuffle trt name within each rep
+  mutate(plot = (rep*100) + 1:9)  %>%     # Designate plot number upon shuffled trtname
+  ungroup()                               # Release the grouping
 
 rcbd_rand
 ```
 
 Let's check if in fact each treatment appears once per block.  
 ```{r}
-rcbd_rand 
+rcbd_rand %>%
+  group_by(rep, trtname) %>%
+  tally() %>%
+  filter(n>1)
 ```
 
 ## Plot layout  
@@ -145,21 +153,23 @@ If this is in fact your study, you may want to export both the field randomizati
 Let's do that below for the RCBD example.  
 
 ```{r}
-rcbd_rand 
+rcbd_rand %>%
   # Retrieving other information contained in trts
-
+left_join(trts) %>%
   # Rearranging columns  
-
+dplyr::select(plot, rep,trtname, trtnum,
+              nrate_kgha, krate_kgha) %>%
+  write_csv("../output/rcbd_randomization_table.csv")
 
 ```
 
-`ggsave()` will save the last plot created in the session, even if from an above chunk. Since the last plot we created was the RCBD layout, we can just go ahead and call ggsave here.  
+`ggsave()` will save the "last plot" created in the session, even if from an above chunk. Since the last plot we created was the RCBD layout, we can just go ahead and call ggsave here.  
 
 ```{r}
 ggsave("../output/rcbd_layoutmap.png",
        width = 6,
        height = 4,
-       bg = "white")
+       bg = "white")  # background color
 ```
 
 
