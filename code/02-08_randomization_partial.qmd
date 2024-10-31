@@ -13,6 +13,7 @@ Here is where we load the packages we will use.
 ```{r setup}
 # Loading packages
 library(tidyverse) # for data wrangling and plotting
+library(ggplot2)
 ```
 
 # Treatment design  
@@ -25,11 +26,13 @@ Keeping with the same motivational example we've been using, our treatment desig
 
 Let's define our treatments above in an object.  
 ```{r}
-trts 
+trts <- crossing(nrate_kgha = c(0,100,200),
+                 krate_kgha = c(0,30,60)) %>%
+  mutate(trtnum = 1:nrow(.)) %>%
+  mutate(trtname = paste0(nrate_kgha, "+", krate_kgha))
 
 trts
 ```
-
 
 # CRD  
 ## Randomization  
@@ -37,13 +40,14 @@ Since it is a CRD, randomization is unrestricted.
 
 ```{r crd_rand}
 # Setting seed to get same randomization result every time
-set.seed(930)
+set.seed(932) # I can change the number "930" if I want to change the seed (pull bank)
 
-crd_rand  
+crd_rand <- crossing(trtname = trts$trtname,
+                     rep = 1:4) %>%
   # Since plots are organized without a structure, let's number them 1 through 36
-
+  mutate(plot = 1:nrow(.)) %>%
   # Randomizing trtname to plots, without restrictions 
-
+  mutate(plot = sample(plot))
 
 crd_rand
 ```
@@ -55,16 +59,31 @@ The number of rows and columns could be decided based on the actual field layout
 Let's assume we have space for 9 rows and 4 columns.  
 
 ```{r crd_layout}
-crd_layout 
+crd_layout <- crd_rand %>%
   # Defining number of rows and columns in the field for plotting purposes
-
+  mutate(row = rep(1:4, each=9)) %>%
+  mutate(col = rep(seq(from = 1,
+                   to = 9,
+                   by = 1), times = 4
+              )) %>%
   # Creating plot and trtname labels for plotting
-
+  mutate(lab = paste0(plot, "\n", trtname))
+  
+crd_layout
 ```
 
 Now, let's plot it.
 ```{r crd map}
-
+ggplot(data = crd_layout,
+       aes(x = row, y = col)
+       ) +
+  geom_tile(aes(fill = trtname),
+            color = "black",
+            show.legend = F
+            ) + 
+  geom_text(aes(label = lab), vjust = 0.5) +
+  labs(title = "CRD randomization of a 3 x 3 factorial (9 trt)") + 
+  theme_void()
 
 ```
 
