@@ -29,7 +29,7 @@ You should NOT analyze a given designed study with a different design than what 
 This is not an option!  
 
 ```{r data import}
-rcbd_df 
+rcbd_df <- read_csv("../data/wheat_nk_balkh.csv")
 
 rcbd_df
 ```
@@ -106,7 +106,9 @@ Below we change the default to sum-to-zero ("contr.sum") before fitting the mode
 options(contrasts = c("contr.sum", "contr.poly"))
 
 # Model fitting
-rcbd_mod 
+rcbd_mod <- lm(yield_kgha ~ rep + nrate_kgha*krate_kgha,
+               data = rcbd_dfw
+               )
 
 # Summary
 summary(rcbd_mod)
@@ -122,7 +124,8 @@ If data is balanced, type 1 and 3 give same results.
 For sake of peace of mind, it is simpler to just always use type 3.  
 
 ```{r ANOVA}
-Anova(rcbd_mod, type=3)
+Anova(rcbd_mod, type=3) 
+# If there is quite low P value (here it's 0.09) of rep, there must be potential heterogeneous conditions among blocks. So RCBD was a good choice over CRD
 ```
 Notice how rep (i.e., block in this case) has a significant effect.  
 
@@ -255,7 +258,8 @@ Remember that it is at this level that we establish the hierarchy of how our pai
 
 Let's extract it by comparing everything to everything else.
 ```{r interaction means all}
-rcbd_means_all 
+rcbd_means_all <- emmeans(rcbd_mod, ~ nrate_kgha:krate_kgha)
+# ":" Check only the interaction effect. No main effect
 
 rcbd_means_all
 ```
@@ -267,15 +271,21 @@ Now that we extracted means, let's perform pairwise comparisons among them.
 rcbd_cld_all <- cld(rcbd_means_all, 
                    reversed=T, 
                    adjust="none",
-               Letters=letters)
-
+                   Letters=letters)
+ 
 rcbd_cld_all
 ```
 
 Let's do some light wrangling here to be able to plot these.  
+- make the stat result as a dataframe
+- trim the letter
+- add trt name column
 
 ```{r selected pwc}
-rcbd_cld_selected <- rcbd_cld_all 
+rcbd_cld_selected <- rcbd_cld_all %>%
+  as.data.frame() %>%
+  mutate(letter = trimws(.group)) %>%
+  mutate(trtname = paste0(nrate_kgha, "+", krate_kgha))
 
 rcbd_cld_selected
 ```
@@ -285,6 +295,26 @@ Let's plot our results, including both **raw data** (for allowing our audience t
 Let's make this plot publication ready.  
 
 ```{r rcbd final plot}
+ggplot(mapping = aes(fill = trtname)) +
+  geom_boxplot(data = rcbd_dfw,
+               aes(x = trtname, y = yield_kgha),
+               alpha = .8) +
+  geom_jitter(data = rcbd_dfw,
+              aes(x = trtname, y = yield_kgha),
+              shape = 21,
+              alpha = .6,
+              size = 2) +
+  geom_label(data = rcbd_cld_selected,
+             aes(x = trtname, y = emmean, label = letter),
+             fill = "white") +
+  labs(x = "N rate + K rate (kg/ha)", y = "Yield (kg/ha)") + 
+  scale_fill_viridis_d() +
+  theme(legend.position = "none",
+        panel.grid.major.y = element_blank(),
+        panel.grid.minor.y = element_blank())
+
+ggsave("../output/rcbd_means.png", width = 8, height = 5)
+
 
 ```
 
